@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRM Casa Matriz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay" class="login-overlay">
+  <div class="login-box">
+    <div class="sidebar-logo" style="justify-content:center; padding:0; margin-bottom:24px; border:none">
+      <img src="artifacts/media__1775835503797.png" class="logo-img" alt="Logo" />
+      <div class="logo-text">
+        <span class="logo-name">Casa Matriz</span>
+        <span class="logo-sub">CRM Ventas</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Correo electrónico</label>
+      <input type="email" id="auth-email" class="form-input" placeholder="tu@correo.com">
+    </div>
+    <div class="form-group" style="margin-bottom:24px">
+      <label class="form-label">Contraseña</label>
+      <input type="password" id="auth-pass" class="form-input" placeholder="••••••••">
+      <div style="text-align:right; margin-top:4px">
+        <span class="forgot-link" onclick="restaurarPassword()" style="font-size:12px; color:var(--accent); cursor:pointer; font-weight:500; text-decoration:underline">¿Olvidaste tu contraseña?</span>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:24px">
+      <label class="form-label">Asignar Perfil (Solo al registrar)</label>
+      <select id="auth-rol" class="form-select">
+        <option value="gerente">Gerente</option>
+        <option value="vendedor">Vendedor</option>
+        <option value="almacen">Almacén</option>
+      </select>
+    </div>
+    <button class="btn-primary" style="width:100%; justify-content:center" onclick="login()">Iniciar Sesión</button>
+    <button class="btn-secondary" style="width:100%; justify-content:center; margin-top:8px" onclick="register()">Registrar Nuevo</button>
+    <div id="auth-error" style="color:var(--danger); font-size:12px; margin-top:12px; text-align:center; min-height:16px"></div>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <img src="artifacts/media__1775835503797.png" class="logo-img" alt="Logo" />
+    <div class="logo-text">
+      <span class="logo-name">Casa Matriz</span>
+      <span class="logo-sub">CRM Ventas</span>
+    </div>
+  </div>
+
+  <div class="sidebar-nav">
+
+  <div class="sidebar-section-label">PRINCIPAL</div>
+  <ul class="sidebar-menu">
+    <li class="sidebar-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
+      <span class="sidebar-icon">📊</span> Dashboard
+    </li>
+    <li class="sidebar-item" data-page="ventas" onclick="navigateTo('ventas')">
+      <span class="sidebar-icon">💰</span> Ventas
+    </li>
+    <li class="sidebar-item" data-page="leads" onclick="navigateTo('leads')">
+      <span class="sidebar-icon">🎯</span> Leads & Pipeline
+    </li>
+    <li class="sidebar-item" data-page="recordatorios" onclick="navigateTo('recordatorios')">
+      <span class="sidebar-icon">🔔</span> Recordatorios
+      <span class="badge" id="badge-recordatorios">0</span>
+    </li>
+    <li class="sidebar-item" data-page="catalogo" onclick="navigateTo('catalogo')">
+      <span class="sidebar-icon">📦</span> Catálogo
+    </li>
+  </ul>
+
+  <div class="sidebar-section-label">HERRAMIENTAS</div>
+  <ul class="sidebar-menu">
+    <li class="sidebar-item" data-page="inventario" onclick="navigateTo('inventario')">
+      <span class="sidebar-icon">📦</span> Inventario
+    </li>
+    <li class="sidebar-item" data-page="vendedores" onclick="navigateTo('vendedores')">
+      <span class="sidebar-icon">👥</span> Vendedores
+    </li>
+    <li class="sidebar-item" data-page="clientes" onclick="navigateTo('clientes')">
+      <span class="sidebar-icon">🤝</span> Clientes
+    </li>
+  </ul>
+
+  <div class="sidebar-section-label">INTELIGENCIA</div>
+  <ul class="sidebar-menu">
+    <li class="sidebar-item" data-page="analitica" onclick="navigateTo('analitica')">
+      <span class="sidebar-icon">📈</span> Analítica Gerencial
+    </li>
+  </ul>
+
+  </div><!-- end sidebar-nav -->
+
+  <div class="sidebar-footer">
+    <div class="unit-badges"></div>
+    <div class="sidebar-footer-text">Cargando unidades...</div>
+  </div>
+</nav>
+
+<!-- MOBILE OVERLAY -->
+<div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+<!-- MAIN CONTENT -->
+<div class="main-wrapper">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+    <div class="topbar-title" id="topbar-title">Dashboard</div>
+    <div class="topbar-actions">
+      <div class="topbar-date" id="topbar-date"></div>
+      <button class="btn-secondary btn-sm" onclick="logout()">Cerrar sesión</button>
+      <button class="btn-primary btn-sm" onclick="openModal('modal-venta')">+ Nueva Venta</button>
+    </div>
+  </header>
+
+  <!-- PAGE CONTAINER -->
+  <main class="page-container">
+
+    <!-- ========== DASHBOARD ========== -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <h1 class="page-title">Dashboard General</h1>
+        <div class="filter-row">
+          <select id="dash-filter-mes" class="form-select" onchange="renderDashboard()">
+            <option value="">Todos los meses</option>
+            <option value="1">Enero</option><option value="2">Febrero</option>
+            <option value="3">Marzo</option><option value="4">Abril</option>
+            <option value="5">Mayo</option><option value="6">Junio</option>
+            <option value="7">Julio</option><option value="8">Agosto</option>
+            <option value="9">Septiembre</option><option value="10">Octubre</option>
+            <option value="11">Noviembre</option><option value="12">Diciembre</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- KPI Cards -->
+      <div class="kpi-grid" id="kpi-grid"></div>
+
+      <!-- Charts Row -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3 class="chart-title">Ventas por Unidad de Negocio</h3>
+          <div class="bar-chart" id="chart-unidades"></div>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-title">Ventas por Vendedor</h3>
+          <div class="bar-chart" id="chart-vendedores"></div>
+        </div>
+      </div>
+
+      <!-- Alerts Table -->
+      <div class="card mt-20">
+        <div class="card-header">
+          <h3 class="card-title">⚠️ Ventas con Descuento Elevado (Requieren Autorización)</h3>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table" id="tabla-alertas">
+            <thead>
+              <tr>
+                <th>Fecha</th><th>Cliente</th><th>Producto</th>
+                <th>Unidad</th><th>% Descuento</th><th>Precio Final</th>
+                <th>Vendedor</th><th>Justificación</th><th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="alertas-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- High Value Loss Alerts -->
+      <div class="card mt-20 role-only gerente">
+        <div class="card-header" style="background: rgba(239,68,68,0.05)">
+          <h3 class="card-title" style="color:var(--danger)">🚨 Alertas de Pérdidas de Alto Valor (> 200 USD)</h3>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Fecha</th><th>Vendedor</th><th>Cliente</th>
+                <th>Monto Perdido</th><th>Motivo</th><th>Observaciones</th><th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="alertas-perdida-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== VENTAS ========== -->
+    <div class="page" id="page-ventas">
+      <div class="page-header">
+        <h1 class="page-title">Módulo de Ventas</h1>
+        <button class="btn-primary" onclick="openModal('modal-venta')">+ Nueva Venta</button>
+      </div>
+
+      <div class="filter-row mb-20">
+        <select id="ventas-filter-unidad" class="form-select" onchange="renderVentas()">
+          <option value="">Todas las unidades</option>
+          <option value="Consumibles">Consumibles</option>
+          <option value="Línea Hogar">Línea Hogar</option>
+          <option value="Maquinaria">Maquinaria</option>
+        </select>
+        <select id="ventas-filter-vendedor" class="form-select" onchange="renderVentas()">
+          <option value="">Todos los vendedores</option>
+        </select>
+        <input type="text" id="ventas-search" class="form-input" placeholder="🔍 Buscar cliente o producto..." oninput="renderVentas()" />
+      </div>
+
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Cliente</th><th>Producto</th><th>Unidad</th>
+              <th>Precio Base</th><th>% Desc.</th><th>Precio Final</th>
+              <th>Descuento $</th><th>Vendedor</th><th>Estado</th><th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="ventas-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ========== LEADS & PIPELINE ========== -->
+    <div class="page" id="page-leads">
+      <div class="page-header">
+        <h1 class="page-title">Leads & Pipeline</h1>
+        <button class="btn-primary" onclick="openModal('modal-lead')">+ Nuevo Lead</button>
+      </div>
+
+      <div class="pipeline-container">
+        <div class="pipeline-col">
+          <div class="pipeline-header prospecto">
+            <span class="pipeline-icon">👤</span>
+            <span>Prospecto</span>
+            <span class="pipeline-count" id="count-prospecto">0</span>
+          </div>
+          <div class="pipeline-cards" id="col-prospecto" ondrop="drop(event,'Prospecto')" ondragover="allowDrop(event)"></div>
+          <button class="pipeline-add-btn" onclick="openLeadInStage('Prospecto')">+</button>
+        </div>
+        <div class="pipeline-col">
+          <div class="pipeline-header cotizacion">
+            <span class="pipeline-icon">📄</span>
+            <span>Cotización Enviada</span>
+            <span class="pipeline-count" id="count-cotizacion">0</span>
+          </div>
+          <div class="pipeline-cards" id="col-cotizacion" ondrop="drop(event,'Cotización Enviada')" ondragover="allowDrop(event)"></div>
+          <button class="pipeline-add-btn" onclick="openLeadInStage('Cotización Enviada')">+</button>
+        </div>
+        <div class="pipeline-col">
+          <div class="pipeline-header cerrada">
+            <span class="pipeline-icon">✅</span>
+            <span>Venta Cerrada</span>
+            <span class="pipeline-count" id="count-cerrada">0</span>
+          </div>
+          <div class="pipeline-cards" id="col-cerrada" ondrop="drop(event,'Venta Cerrada')" ondragover="allowDrop(event)"></div>
+          <button class="pipeline-add-btn" onclick="openLeadInStage('Venta Cerrada')">+</button>
+        </div>
+        <div class="pipeline-col">
+          <div class="pipeline-header postventa">
+            <span class="pipeline-icon">⭐</span>
+            <span>Post-venta</span>
+            <span class="pipeline-count" id="count-postventa">0</span>
+          </div>
+          <div class="pipeline-cards" id="col-postventa" ondrop="drop(event,'Post-venta')" ondragover="allowDrop(event)"></div>
+          <button class="pipeline-add-btn" onclick="openLeadInStage('Post-venta')">+</button>
+        </div>
+        <div class="pipeline-col">
+          <div class="pipeline-header" style="background:var(--bg-dark)">
+            <span class="pipeline-icon">❌</span>
+            <span style="color:var(--danger)">Venta Perdida</span>
+            <span class="pipeline-count" id="count-perdida" style="background:var(--danger)">0</span>
+          </div>
+          <div class="pipeline-cards" id="col-perdida" ondrop="drop(event,'Venta Perdida')" ondragover="allowDrop(event)"></div>
+          <button class="pipeline-add-btn" onclick="openLeadInStage('Venta Perdida')">+</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== RECORDATORIOS ========== -->
+    <div class="page" id="page-recordatorios">
+      <div class="page-header">
+        <h1 class="page-title">Recordatorios de Recompra</h1>
+      </div>
+
+      <div class="info-banner">
+        <span>🔔</span>
+        <span>Los recordatorios de <strong>Consumibles</strong> se generan automáticamente 25 días después de la venta. Marca como contactado cuando hayas hecho el seguimiento.</span>
+      </div>
+
+      <div class="filter-row mb-20">
+        <select id="rec-filter-estado" class="form-select" onchange="renderRecordatorios()">
+          <option value="">Todos</option>
+          <option value="pendiente">Pendientes</option>
+          <option value="contactado">Contactados</option>
+        </select>
+      </div>
+
+      <div id="recordatorios-list"></div>
+    </div>
+
+    <!-- ========== CATÁLOGO ========== -->
+    <div class="page" id="page-catalogo">
+      <div class="page-header">
+        <h1 class="page-title">Catálogo de Productos</h1>
+        <button class="btn-primary" onclick="openModal('modal-producto')">+ Nuevo Producto</button>
+      </div>
+
+      <div class="filter-row mb-20">
+        <select id="cat-filter-unidad" class="form-select" onchange="renderCatalogo()">
+          <option value="">Todas las unidades</option>
+          <option value="Consumibles">Consumibles</option>
+          <option value="Línea Hogar">Línea Hogar</option>
+          <option value="Maquinaria">Maquinaria</option>
+        </select>
+        <input type="text" id="cat-search" class="form-input" placeholder="🔍 Buscar producto..." oninput="renderCatalogo()" />
+      </div>
+
+      <div class="products-grid" id="products-grid"></div>
+    </div>
+
+    <!-- ========== VENDEDORES ========== -->
+    <div class="page" id="page-vendedores">
+      <div class="page-header">
+        <h1 class="page-title">Vendedores</h1>
+        <button class="btn-primary" onclick="openModal('modal-vendedor')">+ Nuevo Vendedor</button>
+      </div>
+      <div class="cards-grid" id="vendedores-grid"></div>
+    </div>
+
+    <!-- ========== CLIENTES ========== -->
+    <div class="page" id="page-clientes">
+      <div class="page-header">
+        <h1 class="page-title">Clientes</h1>
+        <button class="btn-primary" onclick="openModal('modal-cliente')">+ Nuevo Cliente</button>
+      </div>
+      <div class="filter-row mb-20">
+        <input type="text" id="cli-search" class="form-input" placeholder="🔍 Buscar cliente..." oninput="renderClientes()" />
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr><th>Nombre</th><th>Teléfono</th><th>Email</th><th>Fuente</th><th>Notas</th><th>Acciones</th></tr>
+          </thead>
+          <tbody id="clientes-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ========== INVENTARIO ========== -->
+    <div class="page" id="page-inventario">
+      <div class="page-header">
+        <h1 class="page-title">📦 Inventario / Stock</h1>
+        <div class="header-actions" style="display:flex; gap:10px; flex-wrap:wrap">
+          <button class="btn-secondary" onclick="exportarInventarioCSV()">📥 Exportar CSV</button>
+          <button class="btn-secondary" onclick="document.getElementById('file-import-csv').click()">📤 Importar CSV</button>
+          <input type="file" id="file-import-csv" accept=".csv" style="display:none" onchange="importarInventarioCSV(event)" />
+          <button class="btn-primary" onclick="openModal('modal-producto')">+ Nuevo Producto</button>
+        </div>
+      </div>
+      <div class="filter-row mb-20">
+        <input type="text" id="inv-search" class="form-input" placeholder="🔍 Buscar producto en almacén..." oninput="renderInventario()" />
+        <select id="inv-filter-unidad" class="form-select" onchange="renderInventario()">
+          <option value="">Todas las unidades</option>
+        </select>
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr><th>Producto</th><th>Unidad</th><th>Precio</th><th>% Desc. Máx</th><th>Stock Actual</th><th>Acción</th></tr>
+          </thead>
+          <tbody id="inventario-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ========== ANALÍTICA GERENCIAL ========== -->
+    <div class="page" id="page-analitica">
+      <div class="page-header">
+        <h1 class="page-title">Analítica Gerencial</h1>
+        <div class="filter-row">
+          <select id="an-filter-anio" class="form-select" onchange="renderAnalitica()">
+            <option value="">Todos los años</option>
+          </select>
+          <select id="an-filter-unidad" class="form-select" onchange="renderAnalitica()">
+            <option value="">Todas las unidades</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- KPIs Gerenciales -->
+      <div class="kpi-grid" id="an-kpi-grid"></div>
+
+      <!-- Estacionalidad -->
+      <div class="analytics-section">
+        <div class="analytics-section-header">
+          <div>
+            <h2 class="analytics-section-title">📅 Estacionalidad de Ventas</h2>
+            <p class="analytics-section-sub">Evolución mensual de ingresos — identifica picos y valles para planificar campañas</p>
+          </div>
+        </div>
+        <div class="chart-card" style="margin-top:0">
+          <div class="hbar-chart" id="an-chart-estacionalidad"></div>
+        </div>
+      </div>
+
+      <!-- Dos columnas -->
+      <div class="analytics-2col">
+        <!-- Frecuencia de Recompra -->
+        <div class="analytics-section">
+          <div class="analytics-section-header">
+            <div>
+              <h2 class="analytics-section-title">🔁 Frecuencia de Recompra</h2>
+              <p class="analytics-section-sub">Clientes ordenados por cantidad de compras</p>
+            </div>
+          </div>
+          <div class="chart-card" style="margin-top:0">
+            <div id="an-frecuencia-list"></div>
+          </div>
+        </div>
+
+        <!-- Funnel de Conversión -->
+        <div class="analytics-section">
+          <div class="analytics-section-header">
+            <div>
+              <h2 class="analytics-section-title">🎯 Embudo de Conversión</h2>
+              <p class="analytics-section-sub">Leads en cada etapa del pipeline</p>
+            </div>
+          </div>
+          <div class="chart-card" style="margin-top:0">
+            <div id="an-funnel"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dos columnas -->
+      <div class="analytics-2col">
+        <!-- Impacto de Descuentos -->
+        <div class="analytics-section">
+          <div class="analytics-section-header">
+            <div>
+              <h2 class="analytics-section-title">🏷️ Impacto de Descuentos en Rentabilidad</h2>
+              <p class="analytics-section-sub">Proporción de descuentos vs ingreso bruto por unidad</p>
+            </div>
+          </div>
+          <div class="chart-card" style="margin-top:0">
+            <div id="an-descuentos"></div>
+          </div>
+        </div>
+
+        <!-- Top Productos -->
+        <div class="analytics-section">
+          <div class="analytics-section-header">
+            <div>
+              <h2 class="analytics-section-title">🏆 Top Productos por Ingresos</h2>
+              <p class="analytics-section-sub">Los productos que más aportan al negocio</p>
+            </div>
+          </div>
+          <div class="chart-card" style="margin-top:0">
+            <div class="bar-chart" id="an-top-productos"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Canales de adquisición -->
+      <div class="analytics-section">
+        <div class="analytics-section-header">
+          <div>
+            <h2 class="analytics-section-title">📣 Canales de Adquisición</h2>
+            <p class="analytics-section-sub">De dónde provienen tus clientes y cuánto generan</p>
+          </div>
+        </div>
+        <div class="chart-card" style="margin-top:0">
+          <div class="hbar-chart" id="an-canales"></div>
+        </div>
+      </div>
+
+      <!-- Rendimiento por Vendedor -->
+      <div class="analytics-section">
+        <div class="analytics-section-header">
+          <div>
+            <h2 class="analytics-section-title">👥 Rendimiento por Vendedor</h2>
+            <p class="analytics-section-sub">Comparativa de ingresos, tickets promedio y descuentos otorgados</p>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Vendedor</th>
+                <th># Ventas</th>
+                <th>Ingresos Totales</th>
+                <th>Ticket Promedio</th>
+                <th>Desc. Otorgado</th>
+                <th>% Desc. Promedio</th>
+                <th>Score</th>
+              </tr>
+            </thead>
+            <tbody id="an-tabla-vendedores"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Insights Automáticos -->
+      <div class="analytics-section">
+        <div class="analytics-section-header">
+          <div>
+            <h2 class="analytics-section-title">💡 Insights Automáticos</h2>
+            <p class="analytics-section-sub">Observaciones generadas a partir de los datos registrados</p>
+          </div>
+        </div>
+        <div id="an-insights"></div>
+      </div>
+
+      <!-- Centro de Reportes (Exportación) -->
+      <div class="analytics-section mt-40">
+        <div class="analytics-section-header">
+          <div>
+            <h2 class="analytics-section-title">📊 Centro de Reportes y Exportación</h2>
+            <p class="analytics-section-sub">Descarga los datos maestros en formato CSV compatible con Excel para un análisis profundo</p>
+          </div>
+        </div>
+        
+        <div class="report-grid">
+          <div class="card report-card" onclick="exportarReporteVentas()">
+            <div class="report-icon">📉</div>
+            <div class="report-details">
+              <h4 class="report-name">Reporte Maestro de Ventas</h4>
+              <p class="report-desc">Detalle histórico de todas las transacciones, productos y clientes.</p>
+            </div>
+            <button class="btn-ghost">Descargar</button>
+          </div>
+
+          <div class="card report-card" onclick="exportarReporteLeads()">
+            <div class="report-icon">🎯</div>
+            <div class="report-details">
+              <h4 class="report-name">Reporte de Leads & Pipeline</h4>
+              <p class="report-desc">Seguimiento de prospectos, fuentes de captación y estados actuales.</p>
+            </div>
+            <button class="btn-ghost">Descargar</button>
+          </div>
+
+          <div class="card report-card" onclick="exportarReporteVendedores()">
+            <div class="report-icon">👥</div>
+            <div class="report-details">
+              <h4 class="report-name">Ranking de Vendedores</h4>
+              <p class="report-desc">Comparativa de cierres, ingresos generados y ticket promedio.</p>
+            </div>
+            <button class="btn-ghost">Descargar</button>
+          </div>
+
+          <div class="card report-card" onclick="exportarReporteProductos()">
+            <div class="report-icon">📦</div>
+            <div class="report-details">
+              <h4 class="report-name">Rendimiento por Producto</h4>
+              <p class="report-desc">Ranking de productos más vendidos y rentabilidad por unidad.</p>
+            </div>
+            <button class="btn-ghost">Descargar</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<!-- ===== MODALS ===== -->
+
+<!-- MODAL NUEVA VENTA -->
+<div class="modal-backdrop" id="modal-venta">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-venta-title">💰 Nueva Venta</h2>
+      <button class="modal-close" onclick="closeModal('modal-venta')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="v-id" />
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">Fecha *</label>
+          <input type="date" id="v-fecha" class="form-input" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Vendedor *</label>
+          <select id="v-vendedor" class="form-select" required>
+            <option value="">-- Seleccionar --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cliente *</label>
+          <select id="v-cliente" class="form-select" required>
+            <option value="">-- Seleccionar --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unidad de Negocio *</label>
+          <select id="v-unidad" class="form-select" required onchange="filterProductosByUnidad()">
+            <option value="">-- Seleccionar --</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column: 1/-1;">
+          <label class="form-label">🛒 Añadir Productos a la Venta</label>
+          <div style="display:grid; grid-template-columns: 1fr 100px 100px 80px; gap:10px; align-items: end;">
+            <div>
+              <label class="form-label" style="font-size:11px">Producto</label>
+              <select id="v-producto" class="form-select" onchange="onProductoChange()">
+                <option value="">-- Seleccionar --</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label" style="font-size:11px">Precio Un.</label>
+              <input type="number" id="v-precio-base" class="form-input" placeholder="0.00" />
+            </div>
+            <div>
+              <label class="form-label" style="font-size:11px">Cant.</label>
+              <input type="number" id="v-cantidad" class="form-input" min="1" value="1" />
+            </div>
+            <button type="button" class="btn-primary" onclick="addItemToCart()" style="height:42px; width:100%; display:flex; align-items:center; justify-content:center">➕</button>
+          </div>
+        </div>
+
+        <!-- Tabla del Carrito -->
+        <div class="form-group" style="grid-column: 1/-1;">
+          <div class="table-wrapper" style="max-height: 200px; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+            <table class="data-table" style="font-size: 12px;">
+              <thead style="position: sticky; top: 0; background: var(--bg-card); z-index: 1;">
+                <tr>
+                  <th>Producto</th><th>Unidad</th><th>Precio</th><th>Cant.</th><th>Total</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="v-cart-body">
+                <!-- Items se cargarán aquí -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Fuente (Lead)</label>
+          <select id="v-fuente" class="form-select">
+            <option value="Directo">Directo</option>
+            <option value="Instagram">Instagram</option>
+            <option value="Facebook">Facebook</option>
+            <option value="WhatsApp">WhatsApp</option>
+            <option value="Referido">Referido</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">% Descuento Global (Opcional)</label>
+          <input type="number" id="v-descuento" class="form-input" min="0" max="100" value="0" oninput="calcularTotalesCart()" />
+        </div>
+      </div>
+
+      <!-- Alerta descuento -->
+      <div id="v-alerta-descuento" class="alert-descuento hidden">
+        ⚠️ <strong>Descuento supera el límite del 20%.</strong> Se requiere autorización de la Dirección.
+      </div>
+
+      <!-- Justificación -->
+      <div class="form-group mt-10" id="v-justificacion-group" style="display:none;">
+        <label class="form-label">Justificación del Descuento * <span class="label-hint">(Obligatorio si descuento &gt; 0%)</span></label>
+        <textarea id="v-justificacion" class="form-textarea" rows="3" placeholder="Explique el motivo del descuento..."></textarea>
+      </div>
+
+      <div class="form-group mt-10">
+        <label class="form-label">Notas internas</label>
+        <textarea id="v-notas" class="form-textarea" rows="2" placeholder="Acuerdos con el cliente, condiciones especiales..."></textarea>
+      </div>
+
+      <!-- Resumen calculador -->
+      <div class="price-summary" id="price-summary">
+        <div class="price-row">
+          <span>Precio Base:</span>
+          <span id="sum-base">$ 0.00</span>
+        </div>
+        <div class="price-row">
+          <span>Descuento (<span id="sum-pct">0</span>%):</span>
+          <span id="sum-desc" class="text-danger">- $ 0.00</span>
+        </div>
+        <div class="price-row price-total">
+          <span>PRECIO FINAL (x<span id="sum-qty">1</span>):</span>
+          <span id="sum-total">$ 0.00</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-venta')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarVenta()">💾 Guardar Venta</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL VENTA PERDIDA -->
+<div class="modal-backdrop" id="modal-perdida">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">❌ Motivo de Venta Perdida</h2>
+      <button class="modal-close" onclick="closeModal('modal-perdida')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px; color:var(--text-secondary); margin-bottom:20px">Ayúdanos a entender por qué no se concretó esta oportunidad para mejorar nuestro proceso.</p>
+      
+      <div class="reasons-list">
+        <label class="reason-option">
+          <input type="radio" name="lp-reason" value="Precio muy elevado" checked />
+          <span>Precio muy elevado</span>
+        </label>
+        <label class="reason-option">
+          <input type="radio" name="lp-reason" value="Prefirió la competencia" />
+          <span>Prefirió la competencia</span>
+        </label>
+        <label class="reason-option">
+          <input type="radio" name="lp-reason" value="Falta de respuesta del cliente" />
+          <span>Falta de respuesta del cliente</span>
+        </label>
+        <label class="reason-option">
+          <input type="radio" name="lp-reason" value="Producto no cumple expectativas" />
+          <span>El producto no cumple con lo buscado</span>
+        </label>
+        <label class="reason-option">
+          <input type="radio" name="lp-reason" value="Cambio de planes / No es el momento" />
+          <span>Cambio de planes / No es el momento</span>
+        </label>
+        <label class="reason-option">
+          <input type="radio" name="lp-reason" value="Otras razones" />
+          <span>Otras razones...</span>
+        </label>
+      </div>
+
+      <div class="form-group mt-20">
+        <label class="form-label">Observaciones Adicionales</label>
+        <textarea id="lp-obs" class="form-textarea" rows="3" placeholder="Detalla brevemente lo ocurrido..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-perdida')">Cancelar</button>
+      <button class="btn-primary" onclick="confirmarPerdida()">💾 Confirmar Pérdida</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUEVO LEAD -->
+<div class="modal-backdrop" id="modal-lead">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-lead-title">🎯 Nuevo Lead</h2>
+      <button class="modal-close" onclick="closeModal('modal-lead')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="l-id" />
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">Nombre del Prospecto *</label>
+          <input type="text" id="l-nombre" class="form-input" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Teléfono / WhatsApp</label>
+          <input type="tel" id="l-telefono" class="form-input" placeholder="+58..." />
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Correo Electrónico <span style="font-size:11px;color:var(--text-muted)">(Requerido para venta cerrada)</span></label>
+          <input type="email" id="l-email" class="form-input" placeholder="correo@ejemplo.com" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fuente *</label>
+          <select id="l-fuente" class="form-select">
+            <option value="Instagram">📸 Instagram</option>
+            <option value="Facebook">👍 Facebook</option>
+            <option value="WhatsApp">💬 WhatsApp</option>
+            <option value="Referido">🤝 Referido</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unidad de Interés</label>
+          <select id="l-unidad" class="form-select">
+            <option value="">Sin especificar</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Etapa</label>
+          <select id="l-etapa" class="form-select">
+            <option value="Prospecto">Prospecto</option>
+            <option value="Cotización Enviada">Cotización Enviada</option>
+            <option value="Venta Cerrada">Venta Cerrada</option>
+            <option value="Post-venta">Post-venta</option>
+            <option value="Venta Perdida">Venta Perdida</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Vendedor Asignado</label>
+          <select id="l-vendedor" class="form-select">
+            <option value="">Sin asignar</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Monto Estimado ($ USD) *</label>
+          <input type="number" id="l-monto" class="form-input" placeholder="0.00" step="0.01" />
+        </div>
+      </div>
+      <div class="form-group mt-10">
+        <label class="form-label">Notas / Acuerdos con el cliente</label>
+        <textarea id="l-notas" class="form-textarea" rows="4" placeholder="Qué se acordó, productos de interés, descuento prometido, próximos pasos..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-lead')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarLead()">💾 Guardar Lead</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUEVO PRODUCTO -->
+<div class="modal-backdrop" id="modal-producto">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-producto-title">📦 Nuevo Producto</h2>
+      <button class="modal-close" onclick="closeModal('modal-producto')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="p-id" />
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">Nombre del Producto *</label>
+          <input type="text" id="p-nombre" class="form-input" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unidad de Negocio *</label>
+          <select id="p-unidad" class="form-select" required>
+            <option value="">-- Seleccionar --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Precio Base Standard (USD) *</label>
+          <input type="number" id="p-precio" class="form-input" min="0" step="0.01" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">% Descuento Máximo Permitido</label>
+          <input type="number" id="p-desc-max" class="form-input" min="0" max="100" value="20" />
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Descripción</label>
+          <textarea id="p-descripcion" class="form-textarea" rows="2"></textarea>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Foto del Producto (Subir archivo o pegar URL)</label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px">
+            <input type="file" id="p-imagen" class="form-input" accept="image/*" />
+            <input type="text" id="p-imagen-url" class="form-input" placeholder="O pega el enlace aquí (ej. https://...)" />
+          </div>
+          <img id="p-preview" src="" style="width:100%; max-height:150px; object-fit:contain; border-radius:8px; border:1px solid var(--border-color); display:none" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-producto')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarProducto()">💾 Guardar Producto</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUEVO VENDEDOR -->
+<div class="modal-backdrop" id="modal-vendedor">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">👥 Nuevo Vendedor</h2>
+      <button class="modal-close" onclick="closeModal('modal-vendedor')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="vend-id" />
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">Nombre Completo *</label>
+          <input type="text" id="vend-nombre" class="form-input" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Teléfono / WhatsApp</label>
+          <input type="tel" id="vend-telefono" class="form-input" />
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Unidades a Cargo</label>
+          <div class="checkbox-group">
+            <label class="checkbox-label"><input type="checkbox" id="vend-con" value="Consumibles" /> Consumibles</label>
+            <label class="checkbox-label"><input type="checkbox" id="vend-hog" value="Línea Hogar" /> Línea Hogar</label>
+            <label class="checkbox-label"><input type="checkbox" id="vend-maq" value="Maquinaria" /> Maquinaria</label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-vendedor')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarVendedor()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUEVO CLIENTE -->
+<div class="modal-backdrop" id="modal-cliente">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-cliente-title">🤝 Nuevo Cliente</h2>
+      <button class="modal-close" onclick="closeModal('modal-cliente')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cli-id" />
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">Nombre *</label>
+          <input type="text" id="cli-nombre" class="form-input" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Teléfono / WhatsApp *</label>
+          <input type="tel" id="cli-telefono" class="form-input" placeholder="+58..." required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" id="cli-email" class="form-input" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fuente</label>
+          <select id="cli-fuente" class="form-select">
+            <option>Instagram</option><option>Facebook</option>
+            <option>WhatsApp</option><option>Referido</option><option>Directo</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Notas</label>
+          <textarea id="cli-notas" class="form-textarea" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-cliente')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarCliente()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETALLE LEAD -->
+<div class="modal-backdrop" id="modal-lead-detalle">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-lead-detalle-title">Lead</h2>
+      <button class="modal-close" onclick="closeModal('modal-lead-detalle')">✕</button>
+    </div>
+    <div class="modal-body" id="modal-lead-detalle-body"></div>
+    <div class="modal-footer" id="modal-lead-detalle-footer"></div>
+  </div>
+</div>
+
+<!-- MODAL INVENTARIO STOCK -->
+<div class="modal-backdrop" id="modal-stock">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-stock-title">📦 Ajustar Stock</h2>
+      <button class="modal-close" onclick="closeModal('modal-stock')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="stock-pid" />
+      <div class="form-group">
+        <label class="form-label">Producto</label>
+        <div id="stock-pname" style="font-size:14px; font-weight:600; margin-bottom:10px"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ajuste de Cantidad (Usa negativo para restar, ej. -5)</label>
+        <input type="number" id="stock-qty" class="form-input" placeholder="Ej. 10 o -5" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-stock')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarStock()">💾 Guardar Ajuste</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

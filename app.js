@@ -642,9 +642,9 @@ let draggedLeadId = null;
 
 function renderLeads() {
   populateSelects();
-  const stages = ['Prospecto', 'Cotización Enviada', 'Venta Cerrada', 'Post-venta', 'Venta Perdida'];
-  const colIds = ['col-prospecto', 'col-cotizacion', 'col-cerrada', 'col-postventa', 'col-perdida'];
-  const countIds = ['count-prospecto', 'count-cotizacion', 'count-cerrada', 'count-postventa', 'count-perdida'];
+  const stages = ['Prospecto', 'Cotización Enviada', 'Venta Perdida', 'Venta Cerrada', 'Post-venta'];
+  const colIds = ['col-prospecto', 'col-cotizacion', 'col-perdida', 'col-cerrada', 'col-postventa'];
+  const countIds = ['count-prospecto', 'count-cotizacion', 'count-perdida', 'count-cerrada', 'count-postventa'];
 
   stages.forEach((stage, i) => {
     const leads = db.leads.filter(l => l.etapa === stage);
@@ -1209,8 +1209,11 @@ function renderVendedores() {
 function resetClienteForm() {
   document.getElementById('cli-id').value = '';
   document.getElementById('cli-nombre').value = '';
+  document.getElementById('cli-ident').value = '';
   document.getElementById('cli-telefono').value = '';
   document.getElementById('cli-email').value = '';
+  document.getElementById('cli-ubica').value = '';
+  document.getElementById('cli-tipo').value = 'Natural';
   document.getElementById('cli-fuente').value = 'Instagram';
   document.getElementById('cli-notas').value = '';
   document.getElementById('modal-cliente-title').textContent = '🤝 Nuevo Cliente';
@@ -1219,12 +1222,16 @@ function resetClienteForm() {
 function guardarCliente() {
   const nombre = document.getElementById('cli-nombre').value.trim();
   const tel = document.getElementById('cli-telefono').value.trim();
-  if (!nombre || !tel) { showToast('Nombre y teléfono son obligatorios.', 'error'); return; }
-  const existingId = document.getElementById('cli-id').value;
+  if (!nombre || !tel) return showToast('Nombre y teléfono son obligatorios.', 'error');
+
   const cli = {
-    id: existingId || uid(),
-    nombre, telefono: tel,
+    id: document.getElementById('cli-id').value || uid(),
+    nombre,
+    identificacion: document.getElementById('cli-ident').value.trim(),
+    telefono: tel,
     email: document.getElementById('cli-email').value.trim(),
+    ubicacion: document.getElementById('cli-ubica').value.trim(),
+    tipo: document.getElementById('cli-tipo').value,
     fuente: document.getElementById('cli-fuente').value,
     notas: document.getElementById('cli-notas').value.trim(),
   };
@@ -1240,8 +1247,11 @@ function editarCliente(id) {
   document.getElementById('modal-cliente-title').textContent = '✏️ Editar Cliente';
   document.getElementById('cli-id').value = cli.id;
   document.getElementById('cli-nombre').value = cli.nombre;
+  document.getElementById('cli-ident').value = cli.identificacion || '';
   document.getElementById('cli-telefono').value = cli.telefono;
   document.getElementById('cli-email').value = cli.email;
+  document.getElementById('cli-ubica').value = cli.ubicacion || '';
+  document.getElementById('cli-tipo').value = cli.tipo || 'Natural';
   document.getElementById('cli-fuente').value = cli.fuente;
   document.getElementById('cli-notas').value = cli.notas;
   openModal('modal-cliente');
@@ -1265,10 +1275,12 @@ function renderClientes() {
     const waMsg = `Hola ${c.nombre}! 😊 Le saluda el equipo de Casa Matriz. ¿En qué podemos ayudarle hoy?`;
     return `<tr>
       <td><strong>${c.nombre}</strong></td>
+      <td>${c.identificacion || '—'}</td>
       <td>
         <a class="btn-wa" href="${generateWALink(c.telefono, waMsg)}" target="_blank" style="text-decoration:none">💬 ${c.telefono}</a>
       </td>
-      <td>${c.email || '—'}</td>
+      <td><span class="tag info">${c.tipo || 'Natural'}</span></td>
+      <td style="font-size:12px">${c.ubicacion || '—'}</td>
       <td><span class="lead-card-source ${c.fuente}" style="font-size:11px">${c.fuente}</span></td>
       <td style="font-size:12px;color:var(--text-muted)">${c.notas || '—'}</td>
       <td>
@@ -1677,6 +1689,43 @@ function renderAnalitica() {
       <div class="insight-text">${i.text}</div>
     </div>`).join('')
   }</div>`;
+
+  // --- VENTAS POR TIPO DE CLIENTE (NUEVO) ---
+  const typeMap = {};
+  ventas.forEach(v => {
+    const cli = db.clientes.find(c => c.id === v.clienteId);
+    const type = cli ? (cli.tipo || 'Natural') : 'Natural';
+    if (!typeMap[type]) typeMap[type] = 0;
+    typeMap[type] += v.total;
+  });
+  const typeList = Object.entries(typeMap).sort((a,b) => b[1] - a[1]);
+  const typeMax = Math.max(...Object.values(typeMap), 1);
+  document.getElementById('an-ventas-tipo').innerHTML = typeList.length
+    ? typeList.map(([type, total]) => `<div class="bar-item">
+        <div class="bar-label">${type}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(total/typeMax*100).toFixed(1)}%;background:var(--accent)"></div></div>
+        <div class="bar-value">${formatCurrency(total)}</div>
+      </div>`).join('')
+    : '<div class="analytics-empty">Sin datos de tipos de cliente.</div>';
+
+  // --- TOP UBICACIONES (NUEVO) ---
+  const locMap = {};
+  ventas.forEach(v => {
+    const cli = db.clientes.find(c => c.id === v.clienteId);
+    const loc = cli ? (cli.ubicacion || 'Sin especificar') : 'Sin especificar';
+    if (!locMap[loc]) locMap[loc] = 0;
+    locMap[loc] += v.total;
+  });
+  const locList = Object.entries(locMap).sort((a,b) => b[1] - a[1]).slice(0, 10);
+  document.getElementById('an-top-ubicaciones').innerHTML = locList.length
+    ? locList.map(([loc, total]) => `<div class="freq-item">
+        <div class="freq-avatar" style="background:var(--bg-dark)">📍</div>
+        <div class="freq-info">
+          <div class="freq-name">${loc}</div>
+          <div class="freq-meta">${formatCurrency(total)} facturados</div>
+        </div>
+      </div>`).join('')
+    : '<div class="analytics-empty">Sin datos de ubicación.</div>';
 }
 
 function renderInventario() {
@@ -1838,6 +1887,83 @@ function importarInventarioCSV(event) {
             });
     } else {
         showToast('No se encontraron datos válidos en el CSV. Verifica el formato.', 'error');
+        event.target.value = '';
+    }
+  };
+  reader.readAsText(file);
+}
+
+function exportarClientesCSV() {
+  if (!db.clientes.length) return showToast('No hay clientes para exportar.', 'warning');
+  const data = db.clientes.map(c => ({
+    Nombre: c.nombre,
+    Identificacion: c.identificacion || '',
+    Telefono: c.telefono,
+    Email: c.email || '',
+    Ubicacion: c.ubicacion || '',
+    Tipo: c.tipo || 'Natural',
+    Fuente: c.fuente || '',
+    Notas: (c.notas || '').replace(/;/g, ',')
+  }));
+  downloadCSV(data, 'Maestro_Clientes');
+}
+
+function importarClientesCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    const lines = text.split(/\r?\n/);
+    if (lines.length < 2) return showToast('El archivo está vacío o no tiene cabeceras.', 'error');
+
+    const firstLine = lines[0];
+    const separator = (firstLine.includes(';') && (firstLine.split(';').length > firstLine.split(',').length)) ? ';' : ',';
+    
+    let imported = 0;
+    const updates = {};
+    const startIdx = 1; // Asumimos siempre cabeceras
+
+    for (let i = startIdx; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const regex = new RegExp(`${separator}(?=(?:(?:[^"]*"){2})*[^"]*$)`);
+        const columns = line.split(regex);
+        
+        const cleanCol = (col) => {
+            if (!col) return '';
+            let c = col.trim();
+            if (c.startsWith('"') && c.endsWith('"')) c = c.slice(1, -1);
+            return c.replace(/""/g, '"');
+        };
+
+        const nombre = cleanCol(columns[0]);
+        if (nombre) {
+            const cid = uid();
+            updates['clientes/' + cid] = {
+                id: cid,
+                nombre,
+                identificacion: cleanCol(columns[1]),
+                telefono: cleanCol(columns[2]),
+                email: cleanCol(columns[3]),
+                ubicacion: cleanCol(columns[4]),
+                tipo: cleanCol(columns[5]) || 'Natural',
+                fuente: cleanCol(columns[6]) || 'Otro',
+                notas: cleanCol(columns[7])
+            };
+            imported++;
+        }
+    }
+
+    if (imported > 0) {
+        RDB.ref('/').update(updates).then(() => {
+            showToast(`✅ Importados ${imported} clientes exitosamente.`);
+            event.target.value = '';
+        });
+    } else {
+        showToast('No se encontraron clientes válidos.', 'error');
         event.target.value = '';
     }
   };

@@ -261,6 +261,15 @@
           <button class="pipeline-add-btn" onclick="openLeadInStage('Cotización Enviada')">+</button>
         </div>
         <div class="pipeline-col">
+          <div class="pipeline-header" style="background:var(--bg-dark)">
+            <span class="pipeline-icon">❌</span>
+            <span style="color:var(--danger)">Venta Perdida</span>
+            <span class="pipeline-count" id="count-perdida" style="background:var(--danger)">0</span>
+          </div>
+          <div class="pipeline-cards" id="col-perdida" ondrop="drop(event,'Venta Perdida')" ondragover="allowDrop(event)"></div>
+          <button class="pipeline-add-btn" onclick="openLeadInStage('Venta Perdida')">+</button>
+        </div>
+        <div class="pipeline-col">
           <div class="pipeline-header cerrada">
             <span class="pipeline-icon">✅</span>
             <span>Venta Cerrada</span>
@@ -277,15 +286,6 @@
           </div>
           <div class="pipeline-cards" id="col-postventa" ondrop="drop(event,'Post-venta')" ondragover="allowDrop(event)"></div>
           <button class="pipeline-add-btn" onclick="openLeadInStage('Post-venta')">+</button>
-        </div>
-        <div class="pipeline-col">
-          <div class="pipeline-header" style="background:var(--bg-dark)">
-            <span class="pipeline-icon">❌</span>
-            <span style="color:var(--danger)">Venta Perdida</span>
-            <span class="pipeline-count" id="count-perdida" style="background:var(--danger)">0</span>
-          </div>
-          <div class="pipeline-cards" id="col-perdida" ondrop="drop(event,'Venta Perdida')" ondragover="allowDrop(event)"></div>
-          <button class="pipeline-add-btn" onclick="openLeadInStage('Venta Perdida')">+</button>
         </div>
       </div>
     </div>
@@ -345,7 +345,12 @@
     <div class="page" id="page-clientes">
       <div class="page-header">
         <h1 class="page-title">Clientes</h1>
-        <button class="btn-primary" onclick="openModal('modal-cliente')">+ Nuevo Cliente</button>
+        <div class="header-actions" style="display:flex; gap:10px; flex-wrap:wrap">
+          <button class="btn-secondary" onclick="exportarClientesCSV()">📥 Exportar CSV</button>
+          <button class="btn-secondary" onclick="document.getElementById('file-import-clientes').click()">📤 Importar CSV</button>
+          <input type="file" id="file-import-clientes" accept=".csv" style="display:none" onchange="importarClientesCSV(event)" />
+          <button class="btn-primary" onclick="openModal('modal-cliente')">+ Nuevo Cliente</button>
+        </div>
       </div>
       <div class="filter-row mb-20">
         <input type="text" id="cli-search" class="form-input" placeholder="🔍 Buscar cliente..." oninput="renderClientes()" />
@@ -353,7 +358,7 @@
       <div class="table-wrapper">
         <table class="data-table">
           <thead>
-            <tr><th>Nombre</th><th>Teléfono</th><th>Email</th><th>Fuente</th><th>Notas</th><th>Acciones</th></tr>
+            <tr><th>Nombre</th><th>Identificación</th><th>Teléfono</th><th>Tipo</th><th>Ubicación</th><th>Fuente</th><th>Notas</th><th>Acciones</th></tr>
           </thead>
           <tbody id="clientes-body"></tbody>
         </table>
@@ -461,18 +466,37 @@
           </div>
         </div>
 
-        <!-- Top Productos -->
+        </div>
+      </div>
+
+      <!-- Nueva Fila: Segmentación de Clientes -->
+      <div class="analytics-2col" style="margin-top:20px">
+        <!-- Ventas por Tipo de Cliente -->
         <div class="analytics-section">
           <div class="analytics-section-header">
             <div>
-              <h2 class="analytics-section-title">🏆 Top Productos por Ingresos</h2>
-              <p class="analytics-section-sub">Los productos que más aportan al negocio</p>
+              <h2 class="analytics-section-title">👥 Ventas por Tipo de Cliente</h2>
+              <p class="analytics-section-sub">Distribución de ingresos según el perfil del comprador</p>
             </div>
           </div>
           <div class="chart-card" style="margin-top:0">
-            <div class="bar-chart" id="an-top-productos"></div>
+            <div class="bar-chart" id="an-ventas-tipo"></div>
           </div>
         </div>
+
+        <!-- Top Ubicaciones -->
+        <div class="analytics-section">
+          <div class="analytics-section-header">
+            <div>
+              <h2 class="analytics-section-title">📍 Top Ubicaciones por Ingresos</h2>
+              <p class="analytics-section-sub">Zonas geográficas más rentables</p>
+            </div>
+          </div>
+          <div class="chart-card" style="margin-top:0">
+            <div id="an-top-ubicaciones"></div>
+          </div>
+        </div>
+      </div>
       </div>
 
       <!-- Canales de adquisición -->
@@ -796,9 +820,9 @@
           <select id="l-etapa" class="form-select">
             <option value="Prospecto">Prospecto</option>
             <option value="Cotización Enviada">Cotización Enviada</option>
+            <option value="Venta Perdida">Venta Perdida</option>
             <option value="Venta Cerrada">Venta Cerrada</option>
             <option value="Post-venta">Post-venta</option>
-            <option value="Venta Perdida">Venta Perdida</option>
           </select>
         </div>
         <div class="form-group">
@@ -923,12 +947,30 @@
           <input type="text" id="cli-nombre" class="form-input" required />
         </div>
         <div class="form-group">
+          <label class="form-label">Identificación (ID/DNI/RIF)</label>
+          <input type="text" id="cli-ident" class="form-input" placeholder="J-00000000-0" />
+        </div>
+        <div class="form-group">
           <label class="form-label">Teléfono / WhatsApp *</label>
           <input type="tel" id="cli-telefono" class="form-input" placeholder="+58..." required />
         </div>
         <div class="form-group">
           <label class="form-label">Email</label>
           <input type="email" id="cli-email" class="form-input" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ubicación / Dirección</label>
+          <input type="text" id="cli-ubica" class="form-input" placeholder="Ciudad, Sector..." />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo de Cliente</label>
+          <select id="cli-tipo" class="form-select">
+            <option value="Natural">Natural</option>
+            <option value="Empresa">Empresa</option>
+            <option value="Empleado">Empleado</option>
+            <option value="Franquicia">Franquicia</option>
+            <option value="Otro">Otro</option>
+          </select>
         </div>
         <div class="form-group">
           <label class="form-label">Fuente</label>

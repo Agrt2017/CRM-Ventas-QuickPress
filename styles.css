@@ -1059,7 +1059,9 @@ body.role-almacen .sidebar-item[data-page="clientes"],
 body.role-almacen .sidebar-item[data-page="analitica"] { display: none; }
 
 /* Hide Edit/Delete buttons from Vendedor */
-body.role-vendedor .action-restricted { display: none !important; }
+body.role-vendedor .action-restricted,
+body.role-vendedor .role-only.gerente,
+body.role-almacen .role-only.gerente { display: none !important; }
 
 .stock-badge {
   display: inline-block; padding: 4px 8px; border-radius: 4px;
@@ -1233,3 +1235,92 @@ body.role-vendedor .action-restricted { display: none !important; }
     font-size: 13px;
 }
 .alert-descuento.hidden { display: none; }
+
+/* =============================================
+   TAREAS STYLES
+   ============================================= */
+.task-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  border-left: 4px solid var(--accent);
+  margin-bottom: 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: all var(--transition);
+}
+
+.task-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.task-card.completada { opacity: 0.6; border-left-color: var(--success); }
+.task-card.vencida { border-left-color: var(--danger); }
+
+.task-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text-primary); }
+.task-meta { font-size: 11px; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px; }
+.task-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+/* =============================================
+   INVOICE PDF STYLES
+   ============================================= */
+.invoice-box {
+    max-width: 800px;
+    margin: auto;
+    padding: 30px;
+    border: 1px solid #eee;
+    background: #fff;
+    box-shadow: 0 0 10px rgba(0, 0, 0, .15);
+    font-size: 16px;
+    line-height: 24px;
+    font-family: 'Inter', Helvetica, Arial, sans-serif;
+    color: #555;
+}
+
+.invoice-box table {
+    width: 100%;
+    line-height: inherit;
+    text-align: left;
+}
+
+.invoice-box table td {
+    padding: 5px;
+    vertical-align: top;
+}
+
+.invoice-box table tr td:nth-child(2) {
+    text-align: right;
+}
+
+.invoice-box table tr.top table td {
+    padding-bottom: 20px;
+}
+
+.invoice-box table tr.top table td.title {
+    font-size: 45px;
+    line-height: 45px;
+    color: #333;
+}
+
+.invoice-box table tr.information table td {
+    padding-bottom: 40px;
+}
+
+.invoice-box table tr.heading td {
+    background: #eee;
+    border-bottom: 1px solid #ddd;
+    font-weight: bold;
+}
+
+.invoice-box table tr.details td {
+    padding-bottom: 20px;
+}
+
+.invoice-box table tr.item td{
+    border-bottom: 1px solid #eee;
+}
+
+.invoice-box table tr.item.last td {
+    border-bottom: none;
+}
+
+.invoice-box table tr.total td:nth-child(2) {
+    border-top: 2px solid #eee;
+    font-weight: bold;
+}

@@ -17,7 +17,7 @@ const RDB = firebase.database();
 const AUTH = firebase.auth();
 const STO = firebase.storage();
 
-let db = { productos: [], vendedores: [], clientes: [], ventas: [], leads: [], recordatorios: [] };
+let db = { productos: [], vendedores: [], clientes: [], ventas: [], leads: [], recordatorios: [], tareas: [] };
 let currentCart = [];
 let isFirstLoad = true;
 let unsubscribeData = null;
@@ -46,6 +46,7 @@ AUTH.onAuthStateChanged(user => {
       db.ventas = data.ventas ? Object.values(data.ventas) : [];
       db.leads = data.leads ? Object.values(data.leads) : [];
       db.recordatorios = data.recordatorios ? Object.values(data.recordatorios) : [];
+      db.tareas = data.tareas ? Object.values(data.tareas) : [];
 
       if (isFirstLoad) {
         init();
@@ -67,7 +68,7 @@ AUTH.onAuthStateChanged(user => {
       RDB.ref('/').off('value', unsubscribeData);
       unsubscribeData = null;
     }
-    db = { productos: [], vendedores: [], clientes: [], ventas: [], leads: [], recordatorios: [] };
+    db = { productos: [], vendedores: [], clientes: [], ventas: [], leads: [], recordatorios: [], tareas: [] };
   }
 });
 
@@ -262,6 +263,7 @@ function navigateTo(page) {
     clientes: renderClientes,
     analitica: renderAnalitica,
     inventario: renderInventario,
+    tareas: renderTareas,
   };
   if (renders[page]) renders[page]();
 }
@@ -317,6 +319,31 @@ function populateSelects() {
       vcli.innerHTML += `<option value="${c.id}">${c.nombre}</option>`;
     });
     if (val) vcli.value = val;
+  }
+
+  // Tareas: Leads/Clientes select
+  const tvin = document.getElementById('tar-vinculo');
+  if (tvin) {
+    const val = tvin.value;
+    tvin.innerHTML = '<option value="">Ninguno</option>';
+    db.leads.forEach(l => {
+      tvin.innerHTML += `<option value="lead:${l.id}">Lead: ${l.nombre}</option>`;
+    });
+    db.clientes.forEach(c => {
+      tvin.innerHTML += `<option value="cliente:${c.id}">Cliente: ${c.nombre}</option>`;
+    });
+    if (val) tvin.value = val;
+  }
+
+  // Tareas: Vendedores select
+  const tvend = document.getElementById('tar-vendedor');
+  if (tvend) {
+    const val = tvend.value;
+    tvend.innerHTML = '<option value="">-- Seleccionar --</option>';
+    db.vendedores.forEach(v => {
+      tvend.innerHTML += `<option value="${v.id}">${v.nombre}</option>`;
+    });
+    if (val) tvend.value = val;
   }
 }
 
@@ -671,7 +698,12 @@ function renderLeads() {
         <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
           <button class="btn-ghost" style="font-size:11px;padding:4px 8px" onclick="verLead('${lead.id}')">Ver</button>
           <button class="btn-ghost" style="font-size:11px;padding:4px 8px" onclick="editarLead('${lead.id}')">Editar</button>
-          ${lead.telefono ? `<a class="btn-wa" style="font-size:11px;padding:4px 8px" href="${generateWALink(lead.telefono, `Hola ${lead.nombre}, `)}" target="_blank">💬 WA</a>` : ''}
+          ${lead.telefono ? `
+            <div style="display:flex; gap:4px;">
+              <a class="btn-wa" style="font-size:10px;padding:4px 6px" href="${generateWALink(lead.telefono, `Hola ${lead.nombre}, un gusto saludarte. ¿Cómo va todo?`)}" target="_blank" title="Saludo">💬 Hola</a>
+              <a class="btn-wa" style="font-size:10px;padding:4px 6px; background:rgba(37,99,235,0.1); color:var(--accent); border-color:var(--accent)" href="${generateWALink(lead.telefono, `Hola ${lead.nombre}, ya tengo lista tu cotización. ¿Te la envío por aquí o por correo?`)}" target="_blank" title="Cotización">📄 Cotiz.</a>
+            </div>
+          ` : ''}
         </div>
       `;
       card.addEventListener('dragstart', (e) => {
@@ -2167,3 +2199,166 @@ function exportarReporteProductos() {
   downloadCSV(data, 'Reporte_Productos');
 }
 
+// ─── TAREAS MODULE ──────────────────────────────────────────
+function renderTareas() {
+  populateSelects();
+  const filterEstado = document.getElementById('tar-filter-estado')?.value || '';
+  const filterVendedor = document.getElementById('tar-filter-vendedor')?.value || '';
+  
+  const colVencidas = document.getElementById('col-tareas-vencidas');
+  const colHoy = document.getElementById('col-tareas-hoy');
+  const colListas = document.getElementById('col-tareas-listas');
+  
+  colVencidas.innerHTML = '';
+  colHoy.innerHTML = '';
+  colListas.innerHTML = '';
+  
+  let tareas = db.tareas.filter(t => {
+    if (filterEstado && t.estado !== filterEstado) return false;
+    if (filterVendedor && t.vendedorId !== filterVendedor) return false;
+    return true;
+  });
+
+  let counts = { vencidas: 0, hoy: 0, listas: 0 };
+
+  tareas.sort((a,b) => new Date(a.fecha) - new Date(b.fecha)).forEach(t => {
+    const diff = daysUntil(t.fecha);
+    const card = document.createElement('div');
+    card.className = `task-card ${t.estado === 'completada' ? 'completada' : (diff < 0 ? 'vencida' : '')}`;
+    
+    let vinculoText = '—';
+    if (t.vinculoId) {
+      const [type, id] = t.vinculoId.split(':');
+      const obj = type === 'lead' ? db.leads.find(l => l.id === id) : db.clientes.find(c => c.id === id);
+      vinculoText = obj ? obj.nombre : 'Relación eliminada';
+    }
+
+    card.innerHTML = `
+      <div class="task-title">${t.titulo}</div>
+      <div class="task-meta">
+        <span>📅 ${formatDate(t.fecha)} (${diff === 0 ? 'Hoy' : (diff < 0 ? 'Vencida' : 'en ' + diff + ' días')})</span>
+        <span>👥 Asignada a: ${t.vendedorNombre || '—'}</span>
+        <span>🔗 Vinculo: ${vinculoText}</span>
+      </div>
+      <div class="task-actions">
+        ${t.estado === 'pendiente' ? `<button class="btn-primary btn-sm" onclick="completarTarea('${t.id}')">Concluir</button>` : ''}
+        <button class="btn-ghost btn-sm" onclick="eliminarTarea('${t.id}')">✕</button>
+      </div>
+    `;
+
+    if (t.estado === 'completada') {
+      colListas.appendChild(card);
+      counts.listas++;
+    } else if (diff < 0) {
+      colVencidas.appendChild(card);
+      counts.vencidas++;
+    } else {
+      colHoy.appendChild(card);
+      counts.hoy++;
+    }
+  });
+
+  document.getElementById('count-tareas-vencidas').textContent = counts.vencidas;
+  document.getElementById('count-tareas-hoy').textContent = counts.hoy;
+  document.getElementById('count-tareas-listas').textContent = counts.listas;
+}
+
+function resetTareaForm() {
+  document.getElementById('tar-id').value = '';
+  document.getElementById('tar-titulo').value = '';
+  document.getElementById('tar-fecha').value = todayStr();
+  document.getElementById('tar-vendedor').value = '';
+  document.getElementById('tar-vinculo').value = '';
+}
+
+function guardarTarea() {
+  const titulo = document.getElementById('tar-titulo').value.trim();
+  const fecha = document.getElementById('tar-fecha').value;
+  const vendedorId = document.getElementById('tar-vendedor').value;
+  const vinculoId = document.getElementById('tar-vinculo').value;
+
+  if (!titulo || !fecha || !vendedorId) return showToast('Completa los campos obligatorios.', 'error');
+
+  const vend = db.vendedores.find(v => v.id === vendedorId);
+  const t = {
+    id: uid(),
+    titulo,
+    fecha,
+    vendedorId,
+    vendedorNombre: vend ? vend.nombre : '—',
+    vinculoId,
+    estado: 'pendiente',
+    createdAt: new Date().toISOString()
+  };
+
+  RDB.ref('tareas/' + t.id).set(t).then(() => {
+    closeModal('modal-tarea');
+    showToast('✅ Tarea agendada correctamente.');
+    resetTareaForm();
+  });
+}
+
+function completarTarea(id) {
+  RDB.ref('tareas/' + id + '/estado').set('completada')
+    .then(() => showToast('✅ Tarea completada. 🎉'));
+}
+
+function eliminarTarea(id) {
+  if (!confirm('¿Eliminar esta tarea?')) return;
+  RDB.ref('tareas/' + id).remove()
+    .then(() => showToast('Tarea eliminada.', 'warning'));
+}
+
+// ─── PDF GENERATION ──────────────────────────────────────────
+function generarCotizacionDeVenta() {
+  const clienteId = document.getElementById('v-cliente').value;
+  const vendedorId = document.getElementById('v-vendedor').value;
+  const pctGlobal = parseFloat(document.getElementById('v-descuento').value) || 0;
+
+  if (!clienteId || !currentCart.length) {
+    return showToast('Selecciona un cliente y productos para la cotización.', 'warning');
+  }
+
+  const cliente = db.clientes.find(c => c.id === clienteId);
+  const vendedor = db.vendedores.find(v => v.id === vendedorId);
+
+  // Llenar template
+  document.getElementById('inv-fecha').textContent = `Fecha: ${formatDate(todayStr())}`;
+  document.getElementById('inv-cliente-nombre').textContent = cliente ? cliente.nombre : 'Cliente';
+  document.getElementById('inv-cliente-tel').textContent = cliente ? `Tel: ${cliente.telefono || '—'}` : '';
+  document.getElementById('inv-vendedor').textContent = vendedor ? vendedor.nombre : 'Sin asignar';
+
+  const subtotal = currentCart.reduce((sum, item) => sum + item.total, 0);
+  const totalDesc = subtotal * (pctGlobal / 100);
+  const totalFinal = subtotal - totalDesc;
+
+  document.getElementById('inv-items').innerHTML = currentCart.map(item => `
+    <tr class="item">
+      <td style="padding: 10px; border-bottom: 1px solid #eee;">
+        <strong>${item.nombre}</strong><br>
+        <span style="font-size:11px; color:#777;">Unidad: ${item.unidad}</span>
+      </td>
+      <td style="padding: 10px; text-align: center; border-bottom: 1px solid #eee;">${item.cantidad}</td>
+      <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${formatCurrency(item.precioUn)}</td>
+      <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${formatCurrency(item.total)}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('inv-subtotal').textContent = formatCurrency(subtotal);
+  document.getElementById('inv-desc-pct').textContent = pctGlobal;
+  document.getElementById('inv-desc-amt').textContent = '- ' + formatCurrency(totalDesc);
+  document.getElementById('inv-total').textContent = formatCurrency(totalFinal);
+
+  // Generar PDF
+  const element = document.getElementById('invoice-pdf');
+  const opt = {
+    margin:       10,
+    filename:     `Cotizacion_${cliente.nombre.replace(/\s+/g, '_')}_${todayStr()}.pdf`,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2 },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  html2pdf().set(opt).from(element).save();
+  showToast('📄 Preparando descarga de Cotización...');
+}

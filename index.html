@@ -12,6 +12,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
+  <!-- HTML2PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 
@@ -72,6 +74,9 @@
     </li>
     <li class="sidebar-item" data-page="leads" onclick="navigateTo('leads')">
       <span class="sidebar-icon">🎯</span> Leads & Pipeline
+    </li>
+    <li class="sidebar-item" data-page="tareas" onclick="navigateTo('tareas')">
+      <span class="sidebar-icon">✅</span> Tareas Activas
     </li>
     <li class="sidebar-item" data-page="recordatorios" onclick="navigateTo('recordatorios')">
       <span class="sidebar-icon">🔔</span> Recordatorios
@@ -286,6 +291,52 @@
           </div>
           <div class="pipeline-cards" id="col-postventa" ondrop="drop(event,'Post-venta')" ondragover="allowDrop(event)"></div>
           <button class="pipeline-add-btn" onclick="openLeadInStage('Post-venta')">+</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== TAREAS ========== -->
+    <div class="page" id="page-tareas">
+      <div class="page-header">
+        <h1 class="page-title">✅ Planificador de Tareas</h1>
+        <button class="btn-primary" onclick="openModal('modal-tarea')">+ Nueva Tarea</button>
+      </div>
+
+      <div class="filter-row mb-20">
+        <select id="tar-filter-estado" class="form-select" onchange="renderTareas()">
+          <option value="">Todas las tareas</option>
+          <option value="pendiente" selected>Pendientes</option>
+          <option value="completada">Completadas</option>
+        </select>
+        <select id="tar-filter-vendedor" class="form-select role-only gerente" onchange="renderTareas()">
+          <option value="">Todos los vendedores</option>
+        </select>
+      </div>
+
+      <div class="pipeline-container" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="pipeline-col">
+          <div class="pipeline-header" style="background:var(--danger-light); border-left:3px solid var(--danger);">
+            <span class="pipeline-icon" style="color:var(--danger)">⚠️</span>
+            <span>Vencidas / Urgentes</span>
+            <span class="pipeline-count" id="count-tareas-vencidas">0</span>
+          </div>
+          <div class="pipeline-cards" id="col-tareas-vencidas"></div>
+        </div>
+        <div class="pipeline-col">
+          <div class="pipeline-header" style="background:var(--warning-light); border-left:3px solid var(--warning);">
+            <span class="pipeline-icon" style="color:var(--warning)">📅</span>
+            <span>Hoy / Próximas</span>
+            <span class="pipeline-count" id="count-tareas-hoy">0</span>
+          </div>
+          <div class="pipeline-cards" id="col-tareas-hoy"></div>
+        </div>
+        <div class="pipeline-col">
+          <div class="pipeline-header" style="background:var(--success-light); border-left:3px solid var(--success);">
+            <span class="pipeline-icon" style="color:var(--success)">✅</span>
+            <span>Completadas recientes</span>
+            <span class="pipeline-count" id="count-tareas-listas">0</span>
+          </div>
+          <div class="pipeline-cards" id="col-tareas-listas"></div>
         </div>
       </div>
     </div>
@@ -720,9 +771,14 @@
         </div>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn-secondary" onclick="closeModal('modal-venta')">Cancelar</button>
-      <button class="btn-primary" onclick="guardarVenta()">💾 Guardar Venta</button>
+    <div class="modal-footer" style="justify-content: space-between;">
+      <div>
+        <button class="btn-secondary" onclick="generarCotizacionDeVenta()">📄 Generar Cotización PDF</button>
+      </div>
+      <div>
+        <button class="btn-secondary" onclick="closeModal('modal-venta')">Cancelar</button>
+        <button class="btn-primary" onclick="guardarVenta()">💾 Guardar Venta</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1024,6 +1080,114 @@
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-stock')">Cancelar</button>
       <button class="btn-primary" onclick="guardarStock()">💾 Guardar Ajuste</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUEVA TAREA -->
+<div class="modal-backdrop" id="modal-tarea">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">✅ Nueva Tarea</h2>
+      <button class="modal-close" onclick="closeModal('modal-tarea')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="tar-id" />
+      <div class="form-grid-2">
+        <div class="form-group" style="grid-column: 1/-1">
+          <label class="form-label">Descripción de la Tarea *</label>
+          <input type="text" id="tar-titulo" class="form-input" placeholder="Ej: Llamar para confirmar recepción, Enviar catálogo..." required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha Límite *</label>
+          <input type="date" id="tar-fecha" class="form-input" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Asignar a Vendedor *</label>
+          <select id="tar-vendedor" class="form-select" required>
+            <option value="">-- Seleccionar --</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column: 1/-1">
+          <label class="form-label">Vincular a un Lead/Cliente (Opcional)</label>
+          <select id="tar-vinculo" class="form-select">
+            <option value="">Ninguno</option>
+            <!-- Leads will be injected here -->
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-tarea')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarTarea()">💾 Guardar Tarea</button>
+    </div>
+  </div>
+</div>
+
+<!-- INVOICE TEMPLATE (HIDDEN FOR PDF GENERATION) -->
+<div id="invoice-template-container" class="hidden" style="position: absolute; left: -9999px; top: -9999px;">
+  <div id="invoice-pdf" class="invoice-box">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 40px; border-bottom: 2px solid #eee; padding-bottom: 20px;">
+      <div>
+        <h1 style="margin:0; font-size: 28px; color: var(--text-primary);">Cotización Comercial</h1>
+        <div style="color: var(--text-muted); font-size: 14px; margin-top: 5px;" id="inv-fecha">Fecha: </div>
+      </div>
+      <div style="text-align: right;">
+        <h2 style="margin:0; font-size: 20px; color: var(--accent);">Casa Matriz</h2>
+        <div style="color: var(--text-secondary); font-size: 13px; line-height: 1.5; margin-top: 5px;">
+          RIF: J-000000000<br>
+          Av. Principal, Edificio Central<br>
+          Tel: +000 000 0000<br>
+          ventas@casamatriz.com
+        </div>
+      </div>
+    </div>
+    
+    <div style="display:flex; justify-content:space-between; margin-bottom: 40px;">
+      <div style="width: 45%;">
+        <div style="font-size: 11px; font-weight: bold; color: var(--text-muted); text-transform: uppercase; margin-bottom: 5px;">Preparado para:</div>
+        <div style="font-size: 16px; font-weight: bold;" id="inv-cliente-nombre">Nombre del Cliente</div>
+        <div style="font-size: 13px; color: var(--text-secondary); margin-top: 5px;" id="inv-cliente-tel"></div>
+      </div>
+      <div style="width: 45%; text-align:right;">
+        <div style="font-size: 11px; font-weight: bold; color: var(--text-muted); text-transform: uppercase; margin-bottom: 5px;">Atendido por:</div>
+        <div style="font-size: 15px; font-weight: 500;" id="inv-vendedor">Nombre del Vendedor</div>
+      </div>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 13px;">
+      <thead>
+        <tr style="background:var(--bg-dark);">
+          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">Descripción</th>
+          <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">Cant.</th>
+          <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Precio Unit.</th>
+          <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Total</th>
+        </tr>
+      </thead>
+      <tbody id="inv-items">
+      </tbody>
+    </table>
+
+    <div style="display:flex; justify-content:flex-end;">
+      <div style="width: 300px;">
+        <div style="display:flex; justify-content:space-between; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px;">
+          <span style="color:var(--text-secondary);">Subtotal:</span>
+          <strong id="inv-subtotal">$0.00</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px;">
+          <span style="color:var(--text-secondary);">Descuento (<span id="inv-desc-pct">0</span>%):</span>
+          <strong id="inv-desc-amt" style="color:var(--danger)">-$0.00</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding: 12px 0; font-size: 18px; font-weight:bold; color:var(--accent);">
+          <span>Total USD:</span>
+          <span id="inv-total">$0.00</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee; font-size: 11px; color: var(--text-muted); text-align: center;">
+      * Cotización válida por 15 días posteriores a la fecha de emisión. <br>
+      Los montos pueden variar sin previo aviso. Sujetos a disponibilidad de stock al momento de concretar la orden.
     </div>
   </div>
 </div>
